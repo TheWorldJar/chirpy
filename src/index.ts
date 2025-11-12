@@ -9,9 +9,9 @@ const PORT = 8080;
 app.use(middlewareLogResponses);
 app.use("/app", middlewareMetricsInc);
 
-app.get("/healthz", handlerReadiness);
-app.get("/metrics", handlerFileServerHits);
-app.get("/reset", handlerReset);
+app.get("/api/healthz", handlerReadiness);
+app.get("/admin/metrics", handlerFileServerHits);
+app.get("/admin/reset", handlerReset);
 
 app.use("/app", express.static("./src/app"));
 
