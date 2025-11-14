@@ -18,3 +18,23 @@ export function middlewareMetricsInc(req: Request, res: Response, next: NextFunc
     });
     next();
 }
+
+export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
+    console.log(err);
+    switch (err.constructor.name) {
+        case "BadRequestError":
+            res.status(400).send({error: err.message});
+            break;
+        case "UnauthorizedError":
+            res.status(401).send({error: err.message});
+            break;
+        case "ForbiddenError":
+            res.status(403).send({error: err.message});
+            break;
+        case "NotFoundError":
+            res.status(404).send({error: err.message});
+            break;
+        default:
+            console.error("500 - Internal Server Error", err.message);
+    }
+}

@@ -1,5 +1,8 @@
 import {Request, Response} from "express";
 import {config} from "./config.js";
+import {BadRequestError, ForbiddenError, NotFoundError} from "./errortypes.js";
+import {createUser, getUserbyEmail, resetUsers} from "./db/queries/users.js";
+import {createChirp, getAllChirps, getChirpById} from "./db/queries/chirps.js";
 
 export async function handlerReadiness(_: Request, res: Response) {
     res.set("Content-Type", "text/plain; charset=utf-8");
@@ -17,41 +20,77 @@ export async function handlerFileServerHits(_: Request, res: Response) {
 }
 
 export async function handlerReset(_: Request, res: Response) {
+    if (config.platform !== "dev") {
+        throw new ForbiddenError("Platform not in dev mode");
+    }
     config.fileserverHits = 0;
+    await resetUsers();
     res.set("Content-Type", "text/plain; charset=utf-8");
-    res.send(`Hits reset to ${config.fileserverHits}!`);
+    res.send(`Hits reset to ${config.fileserverHits}!\nUsers reset!`);
 }
 
-export async function handlerValidateChirp(req: Request, res: Response) {
+export async function handlerChirps(req: Request, res: Response) {
     type parameters = {
         body: string;
+        userId?: string;
+        email?: string;
     }
 
-    try {
-        const params: parameters = req.body;
-        if (params.body.length > 140) {
-            res.status(400).send(JSON.stringify({"error": "Chirp is too long"}));
-        } else {
-            let body = params.body;
-            const profaneWords = ["Kerfuffle", "Sharbert", "Fornax"];
-            for (let i = 0; i < profaneWords.length; i++) {
-                if (body.includes(profaneWords[i])) {
-                    const words = body.split(profaneWords[i]);
-                    body = words.join("****");
-                }
-                if (body.includes(profaneWords[i].toLowerCase())) {
-                    const words = body.split(profaneWords[i].toLowerCase());
-                    body = words.join("****");
-                }
-                if (body.includes(profaneWords[i].toUpperCase())) {
-                    const words = body.split(profaneWords[i].toUpperCase());
-                    body = words.join("****");
-                }
+    const params: parameters = req.body;
+    if (params.body.length > 140) {
+        throw new BadRequestError("Chirp is too long. Max length is 140");
+    } else {
+        let body = params.body;
+        const profaneWords = ["Kerfuffle", "Sharbert", "Fornax"];
+        for (let i = 0; i < profaneWords.length; i++) {
+            if (body.includes(profaneWords[i])) {
+                const words = body.split(profaneWords[i]);
+                body = words.join("****");
             }
-            res.status(200).send(JSON.stringify({"cleanedBody": body}));
+            if (body.includes(profaneWords[i].toLowerCase())) {
+                const words = body.split(profaneWords[i].toLowerCase());
+                body = words.join("****");
+            }
+            if (body.includes(profaneWords[i].toUpperCase())) {
+                const words = body.split(profaneWords[i].toUpperCase());
+                body = words.join("****");
+            }
         }
-    } catch (error) {
-        console.error(error);
-        res.status(400).send(JSON.stringify({"error": "Invalid JSON"}));
+        if (params.userId) {
+            const chirp = await createChirp(body, params.userId);
+            res.status(201).send(chirp);
+        } else if (params.email) {
+            const [user] = await getUserbyEmail(params.email);
+            const chirp = await createChirp(body, user.id);
+            res.status(201).send(chirp);
+        } else {
+            throw new BadRequestError("User/Email not found");
+        }
+    }
+}
+
+export async function handlerUsers(req: Request, res: Response) {
+    if (req.body.email) {
+        const result = await createUser({email: req.body.email});
+        res.status(201).send(result);
+    } else {
+        throw new BadRequestError("No Email Found");
+    }
+}
+
+export async function handlerGetChirps(req: Request, res: Response) {
+    const chirps = await getAllChirps();
+    res.status(200).send(chirps);
+}
+
+export async function handlerGetChirpById(req: Request, res: Response) {
+    if (req.params.chirpID) {
+        const [chirp] = await getChirpById(req.params.chirpID);
+        if (!chirp.body) {
+            throw new NotFoundError("Chirp not found");
+        }
+        res.status(200).send(chirp);
+    } else {
+        throw new BadRequestError("Invalid chirp id");
     }
 }
