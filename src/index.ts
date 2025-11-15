@@ -4,6 +4,7 @@ import {
     handlerFileServerHits,
     handlerGetChirpById,
     handlerGetChirps,
+    handlerLogin,
     handlerReadiness,
     handlerReset,
     handlerUsers,
@@ -45,6 +46,9 @@ app.post("/api/chirps", (req, res, next) => {
 });
 app.post("/api/users", (req, res, next) => {
     Promise.resolve(handlerUsers(req, res)).catch(next);
+});
+app.post("/api/login", (req, res, next) => {
+    Promise.resolve(handlerLogin(req, res)).catch(next);
 });
 
 app.use("/app", express.static("./src/app"));
