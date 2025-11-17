@@ -4,6 +4,7 @@ import type {MigrationConfig} from "drizzle-orm/xata-http/migrator";
 type APIConfig = {
     fileserverHits: number;
     platform: string;
+    secret: string;
 };
 
 type DBConfig = {
@@ -19,8 +20,13 @@ function envOrThrow(key: string) {
     }
 }
 
-export const config: APIConfig = {fileserverHits: 0, platform: envOrThrow("PLATFORM")};
+export const config: APIConfig = {
+    fileserverHits: 0,
+    platform: envOrThrow("PLATFORM"),
+    secret: envOrThrow("SECRET"),
+};
+
 export const dbConfig: DBConfig = {
     dbURL: envOrThrow("DB_URL"),
-    migrationConfig: {migrationsFolder: envOrThrow("OUT_FOLDER")}
+    migrationConfig: {migrationsFolder: envOrThrow("OUT_FOLDER")},
 };

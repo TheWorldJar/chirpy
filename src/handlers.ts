@@ -3,8 +3,8 @@ import {config} from "./config.js";
 import {BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError} from "./errortypes.js";
 import {createUser, getUserbyEmail, resetUsers} from "./db/queries/users.js";
 import {createChirp, getAllChirps, getChirpById} from "./db/queries/chirps.js";
-import {checkPasswordHash, hashPassword} from "./auth.js";
-import {UserResponse} from "./db/schema.js";
+import {checkPasswordHash, getBearerToken, hashPassword, makeJWT, validateJWT} from "./auth.js";
+import {createRefreshToken, isRefreshToken, revokeRefreshToken} from "./db/queries/refreshtokens.js";
 
 export async function handlerReadiness(_: Request, res: Response) {
     res.set("Content-Type", "text/plain; charset=utf-8");
@@ -34,9 +34,10 @@ export async function handlerReset(_: Request, res: Response) {
 export async function handlerChirps(req: Request, res: Response) {
     type parameters = {
         body: string;
-        userId?: string;
         email?: string;
     }
+
+    const userId = validateJWT(getBearerToken(req), config.secret) as string;
 
     const params: parameters = req.body;
     if (params.body.length > 140) {
@@ -58,16 +59,8 @@ export async function handlerChirps(req: Request, res: Response) {
                 body = words.join("****");
             }
         }
-        if (params.userId) {
-            const chirp = await createChirp(body, params.userId);
-            res.status(201).send(chirp);
-        } else if (params.email) {
-            const [user] = await getUserbyEmail(params.email);
-            const chirp = await createChirp(body, user.id);
-            res.status(201).send(chirp);
-        } else {
-            throw new BadRequestError("User/Email not found");
-        }
+        const chirp = await createChirp(body, userId);
+        res.status(201).send(chirp);
     }
 }
 
@@ -90,18 +83,31 @@ export async function handlerLogin(req: Request, res: Response) {
     type parameters = {
         email: string;
         password: string;
+        expiresInSeconds?: number;
     }
+
     const params: parameters = req.body;
     try {
         const [user] = await getUserbyEmail(params.email);
         const validPass = await checkPasswordHash(params.password, user.hashedPassword);
         if (validPass) {
             const {hashedPassword, ...response} = user;
-            res.status(200).send(response as UserResponse);
+            let token: string;
+            if (params.expiresInSeconds && params.expiresInSeconds > 360) {
+                token = makeJWT(user.id, 360, config.secret);
+            } else if (params.expiresInSeconds && params.expiresInSeconds > 0) {
+                token = makeJWT(user.id, params.expiresInSeconds, config.secret);
+            } else {
+                token = makeJWT(user.id, 360, config.secret);
+            }
+            const refresh = await createRefreshToken(user.id);
+
+            res.status(200).send({...response, "token": token, "refreshToken": refresh});
         } else {
             throw new Error();
         }
     } catch (error) {
+        console.error(error);
         throw new UnauthorizedError("Incorrect email or password");
     }
 }
@@ -120,5 +126,34 @@ export async function handlerGetChirpById(req: Request, res: Response) {
         res.status(200).send(chirp);
     } else {
         throw new BadRequestError("Invalid chirp id");
+    }
+}
+
+export async function handlerRefesh(req: Request, res: Response) {
+    if (!req.body) {
+        const refToken = await isRefreshToken(getBearerToken(req));
+        if (refToken) {
+            const newToken = makeJWT(refToken.userId, 360, config.secret);
+            res.status(200).send({"token": newToken});
+        } else {
+            throw new UnauthorizedError("Invalid refresh token");
+        }
+    } else {
+        throw new BadRequestError("Bad Request");
+    }
+
+}
+
+export async function handlerRevoke(req: Request, res: Response) {
+    if (!req.body) {
+        const refToken = getBearerToken(req);
+        if (refToken) {
+            await revokeRefreshToken(refToken);
+            res.status(204).send();
+        } else {
+            throw new UnauthorizedError("Invalid refresh token");
+        }
+    } else {
+        throw new BadRequestError("Bad Request");
     }
 }

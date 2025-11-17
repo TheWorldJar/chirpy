@@ -6,7 +6,9 @@ import {
     handlerGetChirps,
     handlerLogin,
     handlerReadiness,
+    handlerRefesh,
     handlerReset,
+    handlerRevoke,
     handlerUsers,
 } from "./handlers.js";
 import {errorHandler, middlewareLogResponses, middlewareMetricsInc,} from "./middlewares.js";
@@ -49,6 +51,12 @@ app.post("/api/users", (req, res, next) => {
 });
 app.post("/api/login", (req, res, next) => {
     Promise.resolve(handlerLogin(req, res)).catch(next);
+});
+app.post("/api/refresh", (req, res, next) => {
+    Promise.resolve(handlerRefesh(req, res)).catch(next);
+});
+app.post("/api/revoke", (req, res, next) => {
+    Promise.resolve(handlerRevoke(req, res)).catch(next);
 });
 
 app.use("/app", express.static("./src/app"));
