@@ -1,6 +1,7 @@
 import express from "express";
 import {
     handlerChirps,
+    handlerDeleteChirp,
     handlerFileServerHits,
     handlerGetChirpById,
     handlerGetChirps,
@@ -9,6 +10,7 @@ import {
     handlerRefesh,
     handlerReset,
     handlerRevoke,
+    handlerUpdateUser,
     handlerUsers,
 } from "./handlers.js";
 import {errorHandler, middlewareLogResponses, middlewareMetricsInc,} from "./middlewares.js";
@@ -57,6 +59,14 @@ app.post("/api/refresh", (req, res, next) => {
 });
 app.post("/api/revoke", (req, res, next) => {
     Promise.resolve(handlerRevoke(req, res)).catch(next);
+});
+
+app.put("/api/users", (req, res, next) => {
+    Promise.resolve(handlerUpdateUser(req, res)).catch(next);
+});
+
+app.delete("/api/chirps/:chirpID", (req, res, next) => {
+    Promise.resolve(handlerDeleteChirp(req, res)).catch(next);
 });
 
 app.use("/app", express.static("./src/app"));

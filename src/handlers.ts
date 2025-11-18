@@ -1,10 +1,11 @@
 import {Request, Response} from "express";
 import {config} from "./config.js";
 import {BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError} from "./errortypes.js";
-import {createUser, getUserbyEmail, resetUsers} from "./db/queries/users.js";
-import {createChirp, getAllChirps, getChirpById} from "./db/queries/chirps.js";
+import {createUser, getUserbyEmail, resetUsers, updateUser} from "./db/queries/users.js";
+import {createChirp, deleteChirp, getAllChirps, getChirpById} from "./db/queries/chirps.js";
 import {checkPasswordHash, getBearerToken, hashPassword, makeJWT, validateJWT} from "./auth.js";
 import {createRefreshToken, isRefreshToken, revokeRefreshToken} from "./db/queries/refreshtokens.js";
+import {NewUser} from "./db/schema";
 
 export async function handlerReadiness(_: Request, res: Response) {
     res.set("Content-Type", "text/plain; charset=utf-8");
@@ -64,6 +65,26 @@ export async function handlerChirps(req: Request, res: Response) {
     }
 }
 
+export async function handlerDeleteChirp(req: Request, res: Response) {
+    const userId = validateJWT(getBearerToken(req), config.secret);
+    const chirpId = req.params.chirpID;
+    if (chirpId && userId) {
+        const [chirp] = await getChirpById(chirpId);
+        if (chirp) {
+            if (chirp.userId === userId) {
+                await deleteChirp(chirpId);
+                res.status(204).send();
+            } else {
+                throw new ForbiddenError("Forbidden");
+            }
+        } else {
+            throw new NotFoundError("Chirp not found!");
+        }
+    } else {
+        throw new BadRequestError("Bad Request");
+    }
+}
+
 export async function handlerUsers(req: Request, res: Response) {
     type parameters = {
         email: string;
@@ -120,7 +141,7 @@ export async function handlerGetChirps(req: Request, res: Response) {
 export async function handlerGetChirpById(req: Request, res: Response) {
     if (req.params.chirpID) {
         const [chirp] = await getChirpById(req.params.chirpID);
-        if (!chirp.body) {
+        if (!chirp) {
             throw new NotFoundError("Chirp not found");
         }
         res.status(200).send(chirp);
@@ -153,6 +174,25 @@ export async function handlerRevoke(req: Request, res: Response) {
         } else {
             throw new UnauthorizedError("Invalid refresh token");
         }
+    } else {
+        throw new BadRequestError("Bad Request");
+    }
+}
+
+export async function handlerUpdateUser(req: Request, res: Response) {
+    type parameters = {
+        email: string;
+        password: string;
+    }
+
+    const userId = validateJWT(getBearerToken(req), config.secret);
+    const params: parameters = req.body;
+    if (userId && params.email && params.password) {
+        const hashedPass = await hashPassword(params.password);
+        const newUser: NewUser = {id: userId as string, email: params.email, hashedPassword: hashedPass};
+        const result = await updateUser(newUser);
+        const {hashedPassword, ...response} = result;
+        res.status(200).send(response);
     } else {
         throw new BadRequestError("Bad Request");
     }
