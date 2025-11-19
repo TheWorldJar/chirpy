@@ -51,3 +51,16 @@ export function getBearerToken(req: Request) {
 export function makeRefreshToken() {
     return randomBytes(32).toString("hex");
 }
+
+export function getAPIKey(req: Request) {
+    try {
+        const auth = req.get("authorization") as string;
+        const apiKey = auth.split('ApiKey')[1].trim();
+        if (!apiKey) {
+            throw new Error();
+        }
+        return apiKey;
+    } catch (error) {
+        throw new UnauthorizedError("Unauthorized: Invalid key");
+    }
+}

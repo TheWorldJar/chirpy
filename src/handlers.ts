@@ -1,9 +1,9 @@
 import {Request, Response} from "express";
 import {config} from "./config.js";
 import {BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError} from "./errortypes.js";
-import {createUser, getUserbyEmail, resetUsers, updateUser} from "./db/queries/users.js";
+import {createUser, getUserbyEmail, isChirpyRed, resetUsers, updateUser, upgradeChirpyRed} from "./db/queries/users.js";
 import {createChirp, deleteChirp, getAllChirps, getChirpById} from "./db/queries/chirps.js";
-import {checkPasswordHash, getBearerToken, hashPassword, makeJWT, validateJWT} from "./auth.js";
+import {checkPasswordHash, getAPIKey, getBearerToken, hashPassword, makeJWT, validateJWT} from "./auth.js";
 import {createRefreshToken, isRefreshToken, revokeRefreshToken} from "./db/queries/refreshtokens.js";
 import {NewUser} from "./db/schema";
 
@@ -195,5 +195,36 @@ export async function handlerUpdateUser(req: Request, res: Response) {
         res.status(200).send(response);
     } else {
         throw new BadRequestError("Bad Request");
+    }
+}
+
+export async function handlerUpgradeUser(req: Request, res: Response) {
+    type parameters = {
+        event: string;
+        data: {
+            userId: string;
+        };
+    }
+
+    const apiKey = getAPIKey(req);
+    const params: parameters = req.body;
+    if (apiKey === config.polkaKey) {
+        if (params.event === "user.upgraded") {
+            const isRed = await isChirpyRed(params.data.userId);
+            if (!isRed) {
+                const upgraded = await upgradeChirpyRed(params.data.userId);
+                if (upgraded) {
+                    res.status(204).send();
+                } else {
+                    throw new NotFoundError("User ID not found");
+                }
+            } else {
+                res.status(204).send();
+            }
+        } else {
+            res.status(204).send();
+        }
+    } else {
+        throw new UnauthorizedError("Invalid API Key");
     }
 }

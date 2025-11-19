@@ -11,6 +11,7 @@ import {
     handlerReset,
     handlerRevoke,
     handlerUpdateUser,
+    handlerUpgradeUser,
     handlerUsers,
 } from "./handlers.js";
 import {errorHandler, middlewareLogResponses, middlewareMetricsInc,} from "./middlewares.js";
@@ -59,6 +60,9 @@ app.post("/api/refresh", (req, res, next) => {
 });
 app.post("/api/revoke", (req, res, next) => {
     Promise.resolve(handlerRevoke(req, res)).catch(next);
+});
+app.post("/api/polka/webhooks", (req, res, next) => {
+    Promise.resolve(handlerUpgradeUser(req, res)).catch(next);
 });
 
 app.put("/api/users", (req, res, next) => {
