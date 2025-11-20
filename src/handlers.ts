@@ -2,7 +2,7 @@ import {Request, Response} from "express";
 import {config} from "./config.js";
 import {BadRequestError, ForbiddenError, NotFoundError, UnauthorizedError} from "./errortypes.js";
 import {createUser, getUserbyEmail, isChirpyRed, resetUsers, updateUser, upgradeChirpyRed} from "./db/queries/users.js";
-import {createChirp, deleteChirp, getAllChirps, getChirpById} from "./db/queries/chirps.js";
+import {createChirp, deleteChirp, getAllChirps, getAllChirpsByUserId, getChirpById} from "./db/queries/chirps.js";
 import {checkPasswordHash, getAPIKey, getBearerToken, hashPassword, makeJWT, validateJWT} from "./auth.js";
 import {createRefreshToken, isRefreshToken, revokeRefreshToken} from "./db/queries/refreshtokens.js";
 import {NewUser} from "./db/schema";
@@ -134,7 +134,23 @@ export async function handlerLogin(req: Request, res: Response) {
 }
 
 export async function handlerGetChirps(req: Request, res: Response) {
-    const chirps = await getAllChirps();
+    const authorId = req.query.authorId;
+    const sort = req.query.sort;
+    let chirps;
+
+    if (authorId && typeof authorId === "string") {
+        if (sort === "desc") {
+            chirps = await getAllChirpsByUserId(authorId, sort);
+        } else {
+            chirps = await getAllChirpsByUserId(authorId);
+        }
+    } else {
+        if (sort === "desc") {
+            chirps = await getAllChirps(sort);
+        } else {
+            chirps = await getAllChirps();
+        }
+    }
     res.status(200).send(chirps);
 }
 
